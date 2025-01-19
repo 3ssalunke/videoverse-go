@@ -1,3 +1,7 @@
 package main
 
-func main() {}
+import "github.com/3ssalunke/videoverse/db"
+
+func main() {
+	db.Init()
+}
