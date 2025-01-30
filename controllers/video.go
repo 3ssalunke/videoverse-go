@@ -40,8 +40,8 @@ func (v *VideoController) UploadVideo(c *gin.Context) {
 	video := &db.Video{
 		Name:     uploadedFile.Filename,
 		Path:     uploadedFile.FilePath,
-		Duration: int(videoMeta.FileDuration),
-		Size:     int(videoMeta.FileSize),
+		Duration: videoMeta.FileDuration,
+		Size:     videoMeta.FileSize,
 	}
 
 	err = v.videoRepo.CreateVideo(video)
@@ -50,5 +50,5 @@ func (v *VideoController) UploadVideo(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "video uploaded succesfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "video uploaded succesfully", "video_id": video.ID})
 }
