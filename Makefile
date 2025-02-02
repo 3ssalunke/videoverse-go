@@ -1,3 +1,6 @@
+test-server:
+	@go test -v ./...
+
 run-server:
 	@go run ./cmd/main.go
 

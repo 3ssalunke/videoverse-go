@@ -92,8 +92,10 @@ func ValidateVideo(file multipart.File, fileHeader *multipart.FileHeader) (*Vide
 	return &VideoMeta{FileSize: fileHeader.Size, FileDuration: duration}, nil
 }
 
+var execCommand = exec.Command
+
 func getVideoDuration(filePath string) (float64, error) {
-	cmd := exec.Command("ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", filePath)
+	cmd := execCommand("ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", filePath)
 	output, err := cmd.Output()
 	if err != nil {
 		return 0, fmt.Errorf("error running ffprobe: %w", err)
