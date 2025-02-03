@@ -28,7 +28,7 @@ type UploadedVideo struct {
 	FilePath string
 }
 
-func UploadVideo(file multipart.File, fileHeader *multipart.FileHeader) (*UploadedVideo, error) {
+var UploadVideo = func(file multipart.File, fileHeader *multipart.FileHeader) (*UploadedVideo, error) {
 	if err := os.MkdirAll(UPLOAD_DIR, os.ModePerm); err != nil {
 		log.Printf("failed to create directory: %s", err.Error())
 		return nil, fmt.Errorf("failed to create directory")
@@ -55,7 +55,7 @@ func UploadVideo(file multipart.File, fileHeader *multipart.FileHeader) (*Upload
 	return &UploadedVideo{Filename: filename, FilePath: savePath}, nil
 }
 
-func ValidateVideo(file multipart.File, fileHeader *multipart.FileHeader) (*VideoMeta, error) {
+var ValidateVideo = func(file multipart.File, fileHeader *multipart.FileHeader) (*VideoMeta, error) {
 	maxVideoSizeBytes := MAX_VIDEO_SIZE_MB * 1024 * 1024
 	if fileHeader.Size > int64(maxVideoSizeBytes) {
 		log.Printf("file size exceeds the maximum allowed size of %d MB", MAX_VIDEO_SIZE_MB)
