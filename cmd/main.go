@@ -33,6 +33,7 @@ func main() {
 			videoV1.Use(controllers.AuthMiddleware())
 
 			videoV1.POST("/upload", videoController.UploadVideo)
+			videoV1.POST("/trim", videoController.TrimVideo)
 		}
 	}
 
