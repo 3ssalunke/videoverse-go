@@ -47,6 +47,7 @@ func (m *MockFile) ReadAt(p []byte, off int64) (n int, err error) {
 	return 0, nil
 }
 
+// Upload video
 func TestUploadVideo(t *testing.T) {
 	mockData := []byte("test video data")
 	mockFile := &MockFile{data: mockData}
@@ -61,6 +62,7 @@ func TestUploadVideo(t *testing.T) {
 	os.Remove(uploadedVideo.FilePath)
 }
 
+// Validate Video
 func TestValidateVideo_SizeExceeds(t *testing.T) {
 	mockData := make([]byte, MAX_VIDEO_SIZE_MB*1024*1024+1)
 	mockFile := &MockFile{data: mockData}
@@ -99,6 +101,7 @@ func TestValidateVideo_InvalidDuration(t *testing.T) {
 	execCommand = exec.Command
 }
 
+// Trim Video
 func TestTrimVideo_Success(t *testing.T) {
 	execCommand = func(command string, args ...string) *exec.Cmd {
 		return exec.Command("cmd", "/C", "echo")
@@ -106,5 +109,44 @@ func TestTrimVideo_Success(t *testing.T) {
 
 	err := TrimVideo("input.mp4", "output.mp4", 10.5, 30.5, 20)
 	assert.NoError(t, err)
+
+	execCommand = exec.Command
+}
+
+func TestTrimVideo_Failure(t *testing.T) {
+	execCommand = func(command string, args ...string) *exec.Cmd {
+		cmd := exec.Command("echo")
+		cmd.Process = &os.Process{}
+		return cmd
+	}
+
+	err := TrimVideo("input.mp4", "output.mp4", 10.5, 30.5, 20)
+	assert.Error(t, err)
+
+	execCommand = exec.Command
+}
+
+// Merge video
+func TestMergeVideos_Success(t *testing.T) {
+	execCommand = func(command string, args ...string) *exec.Cmd {
+		return exec.Command("cmd", "/C", "echo")
+	}
+
+	err := MergeVideos([]string{"input1.mp4", "input2.mp4"}, "output.mp4")
+	assert.NoError(t, err)
+
+	execCommand = exec.Command
+}
+
+func TestMergeVideos_Failure(t *testing.T) {
+	execCommand = func(command string, args ...string) *exec.Cmd {
+		cmd := exec.Command("echo")
+		cmd.Process = &os.Process{}
+		return cmd
+	}
+
+	err := MergeVideos([]string{"input1.mp4", "input2.mp4"}, "output.mp4")
+	assert.Error(t, err)
+
 	execCommand = exec.Command
 }

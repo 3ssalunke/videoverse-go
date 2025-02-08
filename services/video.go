@@ -124,3 +124,33 @@ var TrimVideo = func(videoPath, outputPath string, startTs, endTs, duration floa
 
 	return nil
 }
+
+var MergeVideos = func(videoPaths []string, outputPath string) error {
+	videoPathsFilename := "videos.txt"
+	videoPathsFile, err := os.Create(videoPathsFilename)
+	if err != nil {
+		log.Printf("[service] failed to create a file for input video paths: %s", err.Error())
+		return err
+	}
+	defer videoPathsFile.Close()
+
+	for _, path := range videoPaths {
+		_, err := videoPathsFile.WriteString(fmt.Sprintf("file %s\n", path))
+		if err != nil {
+			log.Printf("[service] failed to write to videoPathsFile file: %s", err.Error())
+			return err
+		}
+	}
+
+	args := []string{"-f", "concat", "-safe", "0", "-i", videoPathsFilename, "-c", "copy", outputPath}
+	cmd := execCommand("ffmpeg", args...)
+
+	if err := cmd.Run(); err != nil {
+		log.Printf("[service] failed to merge videos: %s", err.Error())
+		return err
+	}
+
+	os.Remove(videoPathsFilename)
+
+	return nil
+}
