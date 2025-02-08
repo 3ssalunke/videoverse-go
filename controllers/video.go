@@ -18,10 +18,11 @@ import (
 
 type VideoController struct {
 	videoRepo repository.VideoRepository
+	fs        utils.FileSystem
 }
 
-func NewVideoController(videoRepo repository.VideoRepository) *VideoController {
-	return &VideoController{videoRepo}
+func NewVideoController(videoRepo repository.VideoRepository, fs utils.FileSystem) *VideoController {
+	return &VideoController{videoRepo, fs}
 }
 
 func (v *VideoController) UploadVideo(c *gin.Context) {
@@ -83,7 +84,7 @@ func (v *VideoController) TrimVideo(c *gin.Context) {
 		return
 	}
 
-	_, err = os.Stat(video.Path)
+	_, err = v.fs.Stat(video.Path)
 	if os.IsNotExist(err) {
 		errMessage := "video file not found"
 		log.Println("[controller]", errMessage)
@@ -101,7 +102,7 @@ func (v *VideoController) TrimVideo(c *gin.Context) {
 		return
 	}
 
-	fileInfo, err := os.Stat(outputPath)
+	fileInfo, err := v.fs.Stat(outputPath)
 	if err != nil {
 		errMessage := "failed to get trimmed video stat"
 		log.Println("[controller]", errMessage)

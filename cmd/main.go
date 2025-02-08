@@ -7,6 +7,7 @@ import (
 	"github.com/3ssalunke/videoverse/controllers"
 	"github.com/3ssalunke/videoverse/db"
 	"github.com/3ssalunke/videoverse/repository"
+	"github.com/3ssalunke/videoverse/utils"
 	"github.com/gin-gonic/gin"
 )
 
@@ -21,7 +22,8 @@ func main() {
 	{
 		videoV1 := api.Group("/v1/videos")
 		videoRepo := repository.NewVideoRepository(db.DB)
-		videoController := controllers.NewVideoController(videoRepo)
+		fileSystem := new(utils.OSFileSystem)
+		videoController := controllers.NewVideoController(videoRepo, fileSystem)
 
 		{
 			videoV1.GET("/health-check", func(c *gin.Context) {

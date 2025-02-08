@@ -110,7 +110,7 @@ func getVideoDuration(filePath string) (float64, error) {
 	return duration, err
 }
 
-func TrimVideo(videoPath, outputPath string, startTs, endTs, duration float64) error {
+var TrimVideo = func(videoPath, outputPath string, startTs, endTs, duration float64) error {
 	cmd := execCommand("ffmpeg",
 		"-i", videoPath,
 		"-ss", fmt.Sprintf("%.2f", startTs),
