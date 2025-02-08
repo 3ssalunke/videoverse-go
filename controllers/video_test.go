@@ -67,7 +67,7 @@ func TestUploadVideo_MissingFile(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Contains(t, w.Body.String(), `"message":`)
+	assert.Contains(t, w.Body.String(), `"error":`)
 }
 
 func TestUploadVideo_InvalidVideoFile(t *testing.T) {
@@ -95,7 +95,7 @@ func TestUploadVideo_InvalidVideoFile(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Contains(t, w.Body.String(), `{"message":"invalid video file"}`)
+	assert.Contains(t, w.Body.String(), `{"error":"invalid video file"}`)
 }
 
 func TestUploadVideo_UploadFailure(t *testing.T) {
@@ -126,7 +126,7 @@ func TestUploadVideo_UploadFailure(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
-	assert.Contains(t, w.Body.String(), `{"message":"video upload failed"}`)
+	assert.Contains(t, w.Body.String(), `{"error":"video upload failed"}`)
 }
 
 func TestUploadVideo_DatabaseFailure(t *testing.T) {
@@ -160,6 +160,6 @@ func TestUploadVideo_DatabaseFailure(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
-	assert.Contains(t, w.Body.String(), `"message":"database error"`)
+	assert.Contains(t, w.Body.String(), `"error":"database error"`)
 	mockRepo.AssertExpectations(t)
 }

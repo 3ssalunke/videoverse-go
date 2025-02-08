@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"io"
 	"mime/multipart"
 	"os"
@@ -52,6 +53,7 @@ func TestUploadVideo(t *testing.T) {
 	fileHeader := &multipart.FileHeader{Filename: "test.mp4", Size: int64(len(mockData))}
 
 	uploadedVideo, err := UploadVideo(mockFile, fileHeader)
+	fmt.Println(uploadedVideo)
 	assert.NoError(t, err)
 	assert.NotNil(t, uploadedVideo)
 	assert.True(t, strings.HasPrefix(uploadedVideo.FilePath, UPLOAD_DIR))
@@ -94,5 +96,15 @@ func TestValidateVideo_InvalidDuration(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, videoMeta)
 
+	execCommand = exec.Command
+}
+
+func TestTrimVideo_Success(t *testing.T) {
+	execCommand = func(command string, args ...string) *exec.Cmd {
+		return exec.Command("cmd", "/C", "echo")
+	}
+
+	err := TrimVideo("input.mp4", "output.mp4", 10.5, 30.5, 20)
+	assert.NoError(t, err)
 	execCommand = exec.Command
 }

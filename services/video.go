@@ -16,7 +16,7 @@ const (
 	MAX_VIDEO_SIZE_MB          = 150
 	MIN_VIDEO_DURATION_SECONDS = 5
 	MAX_VIDEO_DURATION_SECONDS = 50
-	UPLOAD_DIR                 = "./video_store/"
+	UPLOAD_DIR                 = "video_store"
 )
 
 type VideoMeta struct {
@@ -111,7 +111,7 @@ func getVideoDuration(filePath string) (float64, error) {
 }
 
 func TrimVideo(videoPath, outputPath string, startTs, endTs, duration float64) error {
-	cmd := exec.Command("ffmpeg",
+	cmd := execCommand("ffmpeg",
 		"-i", videoPath,
 		"-ss", fmt.Sprintf("%.2f", startTs),
 		"-to", fmt.Sprintf("%.2f", endTs),
