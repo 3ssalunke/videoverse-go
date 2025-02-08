@@ -1,7 +1,6 @@
 package services
 
 import (
-	"fmt"
 	"io"
 	"mime/multipart"
 	"os"
@@ -54,7 +53,6 @@ func TestUploadVideo(t *testing.T) {
 	fileHeader := &multipart.FileHeader{Filename: "test.mp4", Size: int64(len(mockData))}
 
 	uploadedVideo, err := UploadVideo(mockFile, fileHeader)
-	fmt.Println(uploadedVideo)
 	assert.NoError(t, err)
 	assert.NotNil(t, uploadedVideo)
 	assert.True(t, strings.HasPrefix(uploadedVideo.FilePath, UPLOAD_DIR))

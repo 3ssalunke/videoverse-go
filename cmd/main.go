@@ -36,6 +36,7 @@ func main() {
 
 			videoV1.POST("/upload", videoController.UploadVideo)
 			videoV1.POST("/trim", videoController.TrimVideo)
+			videoV1.POST("/merge", videoController.MergeVideos)
 		}
 	}
 

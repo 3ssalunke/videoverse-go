@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"mime/multipart"
@@ -97,12 +98,16 @@ var execCommand = exec.Command
 
 func getVideoDuration(filePath string) (float64, error) {
 	cmd := execCommand("ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", filePath)
-	output, err := cmd.Output()
-	if err != nil {
-		return 0, fmt.Errorf("error running ffprobe: %w", err)
+
+	var outBuf bytes.Buffer
+	cmd.Stdout = &outBuf
+	cmd.Stderr = &outBuf
+
+	if err := cmd.Run(); err != nil {
+		return 0, fmt.Errorf("error running ffprobe: %s %s", outBuf.String(), err.Error())
 	}
 
-	duration, err := strconv.ParseFloat(strings.TrimSpace(string(output)), 64)
+	duration, err := strconv.ParseFloat(strings.TrimSpace(outBuf.String()), 64)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse duration: %w", err)
 	}
@@ -117,8 +122,11 @@ var TrimVideo = func(videoPath, outputPath string, startTs, endTs, duration floa
 		"-to", fmt.Sprintf("%.2f", endTs),
 		"-c", "copy", outputPath)
 
+	var outBuf bytes.Buffer
+	cmd.Stderr = &outBuf
+
 	if err := cmd.Run(); err != nil {
-		log.Printf("[service] failed to trim video: %s", err.Error())
+		log.Printf("[service] failed to trim video: %s %s", outBuf.String(), err.Error())
 		return err
 	}
 
@@ -127,15 +135,20 @@ var TrimVideo = func(videoPath, outputPath string, startTs, endTs, duration floa
 
 var MergeVideos = func(videoPaths []string, outputPath string) error {
 	videoPathsFilename := "videos.txt"
+
 	videoPathsFile, err := os.Create(videoPathsFilename)
 	if err != nil {
 		log.Printf("[service] failed to create a file for input video paths: %s", err.Error())
 		return err
 	}
-	defer videoPathsFile.Close()
+	defer func() {
+		videoPathsFile.Close()
+		os.Remove(videoPathsFilename)
+	}()
 
 	for _, path := range videoPaths {
-		_, err := videoPathsFile.WriteString(fmt.Sprintf("file %s\n", path))
+		abspath := filepath.ToSlash(path)
+		_, err := videoPathsFile.WriteString(fmt.Sprintf("file %s\n", abspath))
 		if err != nil {
 			log.Printf("[service] failed to write to videoPathsFile file: %s", err.Error())
 			return err
@@ -145,12 +158,13 @@ var MergeVideos = func(videoPaths []string, outputPath string) error {
 	args := []string{"-f", "concat", "-safe", "0", "-i", videoPathsFilename, "-c", "copy", outputPath}
 	cmd := execCommand("ffmpeg", args...)
 
+	var outBuf bytes.Buffer
+	cmd.Stderr = &outBuf
+
 	if err := cmd.Run(); err != nil {
-		log.Printf("[service] failed to merge videos: %s", err.Error())
+		log.Printf("[service] failed to merge videos: %s %s", outBuf.String(), err.Error())
 		return err
 	}
-
-	os.Remove(videoPathsFilename)
 
 	return nil
 }

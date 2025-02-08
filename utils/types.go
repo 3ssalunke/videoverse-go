@@ -5,3 +5,7 @@ type VideoTrimRequest struct {
 	StartTS float64 `json:"start_ts"`
 	EndTS   float64 `json:"end_ts"`
 }
+
+type VideosMergeRequest struct {
+	VideoIDs []string `json:"video_ids"`
+}

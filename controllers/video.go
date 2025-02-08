@@ -125,3 +125,81 @@ func (v *VideoController) TrimVideo(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "video trimmed successfully", "video_id": video.ID})
 }
+
+func (v *VideoController) MergeVideos(c *gin.Context) {
+	var mergeReqPayload utils.VideosMergeRequest
+
+	if err := c.ShouldBindJSON(&mergeReqPayload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if len(mergeReqPayload.VideoIDs) < 2 {
+		errMessage := "please give at least two video ids in request"
+		log.Println("[controller]", errMessage)
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMessage})
+		return
+	}
+
+	videos, err := v.videoRepo.GetVideosByIDs(mergeReqPayload.VideoIDs)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if len(videos) != len(mergeReqPayload.VideoIDs) {
+		errMessage := "one or more video IDs do not exist"
+		log.Println("[controller]", errMessage)
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMessage})
+		return
+	}
+
+	var videoFilepaths []string
+	mergedVideoDuration := 0.0
+
+	for _, video := range videos {
+		_, err = v.fs.Stat(video.Path)
+		if os.IsNotExist(err) {
+			errMessage := fmt.Sprintf("video file not found for id %s", video.ID)
+			log.Println("[controller]", errMessage)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": errMessage})
+			return
+		}
+		videoFilepaths = append(videoFilepaths, video.Path)
+		mergedVideoDuration += video.Duration
+	}
+
+	currTimestamp := time.Now().UnixMilli()
+	mergedFilename := fmt.Sprintf("%d-merged.mp4", currTimestamp)
+	outputPath := filepath.Join(services.UPLOAD_DIR, mergedFilename)
+
+	fmt.Println(videoFilepaths)
+
+	if err := services.MergeVideos(videoFilepaths, outputPath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to merge videos"})
+		return
+	}
+
+	fileInfo, err := v.fs.Stat(outputPath)
+	if err != nil {
+		errMessage := "failed to get trimmed video stat"
+		log.Println("[controller]", errMessage)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": errMessage})
+		return
+	}
+
+	video := &db.Video{
+		Name:     mergedFilename,
+		Path:     outputPath,
+		Duration: mergedVideoDuration,
+		Size:     fileInfo.Size(),
+	}
+
+	err = v.videoRepo.CreateVideo(video)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "videos merged successfully", "video_id": video.ID})
+}
