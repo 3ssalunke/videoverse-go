@@ -120,7 +120,7 @@ func TestUploadVideo_InvalidVideoFile(t *testing.T) {
 	})
 }
 
-func TestUploadVideo_UploadFailure(t *testing.T) {
+func TestUploadVideo_UploadServiceFailure(t *testing.T) {
 	services.UploadVideo = func(video multipart.File, fileHeader *multipart.FileHeader) (*services.UploadedVideo, error) {
 		return nil, errors.New("video upload failed")
 	}
@@ -232,7 +232,7 @@ func TestTrimVideo_Success(t *testing.T) {
 	})
 }
 
-func TestTrimVideo_InvalideJSON(t *testing.T) {
+func TestTrimVideo_InvalidJSON(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/trim", bytes.NewBuffer([]byte(`{invalid-json}`)))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -247,7 +247,7 @@ func TestTrimVideo_InvalideJSON(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 }
 
-func TestTrimVideo_VideoNotFound(t *testing.T) {
+func TestTrimVideo_VideoNotFoundInDB(t *testing.T) {
 	mockRepo.On("GetVideoByID", "non-existent-video-id").Return(nil, errors.New("video not found"))
 
 	videoController := NewVideoController(mockRepo, mockFS)
@@ -309,7 +309,7 @@ func TestTrimVideo_InvalidTimestamps(t *testing.T) {
 	})
 }
 
-func TestTrimVideo_FileNotFound(t *testing.T) {
+func TestTrimVideo_VideoFileNotFoundInStore(t *testing.T) {
 	mockRepo.On("GetVideoByID", "video-id").Return(&db.Video{
 		ID:       "video-id",
 		Name:     "test.mp4",
@@ -338,6 +338,319 @@ func TestTrimVideo_FileNotFound(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 	assert.Contains(t, w.Body.String(), `"error":"video file not found"`)
+	mockRepo.AssertExpectations(t)
+
+	t.Cleanup(func() {
+		mockRepo = new(repoMock.MockVideoRepositoryImpl)
+		mockFS = new(fsMock.MockFileSystem)
+	})
+}
+
+// Merge videos
+func TestMergeVideos_Success(t *testing.T) {
+	mockRepo.On("GetVideosByIDs", []string{"video-id-1", "video-id-2"}).Return([]db.Video{
+		{
+			ID:       "video-id-1",
+			Name:     "test-1.mp4",
+			Path:     "videos/test-1.mp4",
+			Duration: 100.0,
+			Size:     2500000,
+		},
+		{
+			ID:       "video-id-2",
+			Name:     "test-2.mp4",
+			Path:     "videos/test-2.mp4",
+			Duration: 120.0,
+			Size:     3000000,
+		},
+	}, nil)
+	mockRepo.On("CreateVideo", mock.Anything).Return(nil)
+
+	mockFileInfo := fsMock.MockFileInfo{}
+	mockFS.On("Stat", mock.AnythingOfType("string")).Return(mockFileInfo, nil)
+
+	services.MergeVideos = func(videoPaths []string, outputPath string) error {
+		return nil
+	}
+
+	videoController := NewVideoController(mockRepo, mockFS)
+	router := setupRouter("/merge", "post", videoController.MergeVideos)
+
+	mergeReq := utils.VideosMergeRequest{
+		VideoIDs: []string{"video-id-1", "video-id-2"},
+	}
+	jsonVal, _ := json.Marshal(mergeReq)
+
+	req := httptest.NewRequest(http.MethodPost, "/merge", bytes.NewBuffer(jsonVal))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), `"message":"videos merged successfully"`)
+	mockRepo.AssertExpectations(t)
+
+	t.Cleanup(func() {
+		mockRepo = new(repoMock.MockVideoRepositoryImpl)
+		mockFS = new(fsMock.MockFileSystem)
+	})
+}
+
+func TestMergeVideos_InvalidJSON(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/merge", bytes.NewBuffer([]byte(`{invalid-json}`)))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	videoController := NewVideoController(mockRepo, mockFS)
+	router := setupRouter("/merge", "post", videoController.MergeVideos)
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), `"error"`)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestMergeVideos_InsufficientVideoIDs(t *testing.T) {
+	mergeReq := utils.VideosMergeRequest{
+		VideoIDs: []string{"video-id-1"},
+	}
+	jsonVal, _ := json.Marshal(mergeReq)
+
+	req := httptest.NewRequest(http.MethodPost, "/merge", bytes.NewBuffer(jsonVal))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	videoController := NewVideoController(mockRepo, mockFS)
+	router := setupRouter("/merge", "post", videoController.MergeVideos)
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), `"error":"please give at least two video ids in request"`)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestMergeVideos_VideoNotFoundInDB(t *testing.T) {
+	mockRepo.On("GetVideosByIDs", []string{"video-id-1", "video-id-3"}).Return([]db.Video{
+		{
+			ID:       "video-id-1",
+			Name:     "test-1.mp4",
+			Path:     "videos/test-1.mp4",
+			Duration: 100.0,
+			Size:     2500000,
+		},
+	}, nil)
+
+	mergeReq := utils.VideosMergeRequest{
+		VideoIDs: []string{"video-id-1", "video-id-3"},
+	}
+	jsonVal, _ := json.Marshal(mergeReq)
+
+	req := httptest.NewRequest(http.MethodPost, "/merge", bytes.NewBuffer(jsonVal))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	videoController := NewVideoController(mockRepo, mockFS)
+	router := setupRouter("/merge", "post", videoController.MergeVideos)
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), `"error":"one or more video IDs do not exist"`)
+	mockRepo.AssertExpectations(t)
+
+	t.Cleanup(func() {
+		mockRepo = new(repoMock.MockVideoRepositoryImpl)
+	})
+}
+
+func TestMergeVideos_VideoFileNotFoundInStore(t *testing.T) {
+	mockRepo.On("GetVideosByIDs", []string{"video-id-1", "video-id-2"}).Return([]db.Video{
+		{
+			ID:       "video-id-1",
+			Name:     "test-1.mp4",
+			Path:     "videos/test-1.mp4",
+			Duration: 100.0,
+			Size:     2500000,
+		},
+		{
+			ID:       "video-id-2",
+			Name:     "test-2.mp4",
+			Path:     "videos/test-2.mp4",
+			Duration: 120.0,
+			Size:     3000000,
+		},
+	}, nil)
+
+	mockFS.On("Stat", mock.AnythingOfType("string")).Return(nil, os.ErrNotExist)
+
+	videoController := NewVideoController(mockRepo, mockFS)
+	router := setupRouter("/merge", "post", videoController.MergeVideos)
+
+	mergeReq := utils.VideosMergeRequest{
+		VideoIDs: []string{"video-id-1", "video-id-2"},
+	}
+	jsonVal, _ := json.Marshal(mergeReq)
+
+	req := httptest.NewRequest(http.MethodPost, "/merge", bytes.NewBuffer(jsonVal))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Contains(t, w.Body.String(), `"error":"video file not found for id video-id-1"`)
+	mockRepo.AssertExpectations(t)
+
+	t.Cleanup(func() {
+		mockRepo = new(repoMock.MockVideoRepositoryImpl)
+		mockFS = new(fsMock.MockFileSystem)
+	})
+}
+
+func TestMergeVideos_MergeServiceFailure(t *testing.T) {
+	mockRepo.On("GetVideosByIDs", []string{"video-id-1", "video-id-2"}).Return([]db.Video{
+		{
+			ID:       "video-id-1",
+			Name:     "test-1.mp4",
+			Path:     "videos/test-1.mp4",
+			Duration: 100.0,
+			Size:     2500000,
+		},
+		{
+			ID:       "video-id-2",
+			Name:     "test-2.mp4",
+			Path:     "videos/test-2.mp4",
+			Duration: 120.0,
+			Size:     3000000,
+		},
+	}, nil)
+
+	mockFileInfo := fsMock.MockFileInfo{}
+	mockFS.On("Stat", mock.AnythingOfType("string")).Return(mockFileInfo, nil)
+
+	services.MergeVideos = func(videoPaths []string, outputPath string) error {
+		return errors.New("merge failed")
+	}
+
+	videoController := NewVideoController(mockRepo, mockFS)
+	router := setupRouter("/merge", "post", videoController.MergeVideos)
+
+	mergeReq := utils.VideosMergeRequest{
+		VideoIDs: []string{"video-id-1", "video-id-2"},
+	}
+	jsonVal, _ := json.Marshal(mergeReq)
+
+	req := httptest.NewRequest(http.MethodPost, "/merge", bytes.NewBuffer(jsonVal))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Contains(t, w.Body.String(), `"error":"failed to merge videos"`)
+	mockRepo.AssertExpectations(t)
+
+	t.Cleanup(func() {
+		mockRepo = new(repoMock.MockVideoRepositoryImpl)
+		mockFS = new(fsMock.MockFileSystem)
+	})
+}
+
+func TestMergeVideos_MergedVideoFileStatFailure(t *testing.T) {
+	mockRepo.On("GetVideosByIDs", []string{"video-id-1", "video-id-2"}).Return([]db.Video{
+		{
+			ID:       "video-id-1",
+			Name:     "test-1.mp4",
+			Path:     "videos/test-1.mp4",
+			Duration: 100.0,
+			Size:     2500000,
+		},
+		{
+			ID:       "video-id-2",
+			Name:     "test-2.mp4",
+			Path:     "videos/test-2.mp4",
+			Duration: 120.0,
+			Size:     3000000,
+		},
+	}, nil)
+
+	mockFileInfo := fsMock.MockFileInfo{}
+	mockFS.On("Stat", mock.AnythingOfType("string")).Return(mockFileInfo, nil).Times(2)
+	mockFS.On("Stat", mock.AnythingOfType("string")).Return(nil, errors.New("file not found")).Once()
+
+	services.MergeVideos = func(videoPaths []string, outputPath string) error {
+		return nil
+	}
+
+	videoController := NewVideoController(mockRepo, mockFS)
+	router := setupRouter("/merge", "post", videoController.MergeVideos)
+
+	mergeReq := utils.VideosMergeRequest{
+		VideoIDs: []string{"video-id-1", "video-id-2"},
+	}
+	jsonVal, _ := json.Marshal(mergeReq)
+
+	req := httptest.NewRequest(http.MethodPost, "/merge", bytes.NewBuffer(jsonVal))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Contains(t, w.Body.String(), `"error":"failed to get merged video stat"`)
+	mockRepo.AssertExpectations(t)
+
+	t.Cleanup(func() {
+		mockRepo = new(repoMock.MockVideoRepositoryImpl)
+		mockFS = new(fsMock.MockFileSystem)
+	})
+}
+
+func TestMergeVideos_CreateDBCallFailure(t *testing.T) {
+	mockRepo.On("GetVideosByIDs", []string{"video-id-1", "video-id-2"}).Return([]db.Video{
+		{
+			ID:       "video-id-1",
+			Name:     "test-1.mp4",
+			Path:     "videos/test-1.mp4",
+			Duration: 100.0,
+			Size:     2500000,
+		},
+		{
+			ID:       "video-id-2",
+			Name:     "test-2.mp4",
+			Path:     "videos/test-2.mp4",
+			Duration: 120.0,
+			Size:     3000000,
+		},
+	}, nil)
+	mockRepo.On("CreateVideo", mock.Anything).Return(errors.New("database error"))
+
+	mockFileInfo := fsMock.MockFileInfo{}
+	mockFS.On("Stat", mock.AnythingOfType("string")).Return(mockFileInfo, nil)
+
+	services.MergeVideos = func(videoPaths []string, outputPath string) error {
+		return nil
+	}
+
+	videoController := NewVideoController(mockRepo, mockFS)
+	router := setupRouter("/merge", "post", videoController.MergeVideos)
+
+	mergeReq := utils.VideosMergeRequest{
+		VideoIDs: []string{"video-id-1", "video-id-2"},
+	}
+	jsonVal, _ := json.Marshal(mergeReq)
+
+	req := httptest.NewRequest(http.MethodPost, "/merge", bytes.NewBuffer(jsonVal))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Contains(t, w.Body.String(), `"error":"database error"`)
 	mockRepo.AssertExpectations(t)
 
 	t.Cleanup(func() {

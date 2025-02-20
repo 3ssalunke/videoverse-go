@@ -173,8 +173,6 @@ func (v *VideoController) MergeVideos(c *gin.Context) {
 	mergedFilename := fmt.Sprintf("%d-merged.mp4", currTimestamp)
 	outputPath := filepath.Join(services.UPLOAD_DIR, mergedFilename)
 
-	fmt.Println(videoFilepaths)
-
 	if err := services.MergeVideos(videoFilepaths, outputPath); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to merge videos"})
 		return
@@ -182,7 +180,7 @@ func (v *VideoController) MergeVideos(c *gin.Context) {
 
 	fileInfo, err := v.fs.Stat(outputPath)
 	if err != nil {
-		errMessage := "failed to get trimmed video stat"
+		errMessage := "failed to get merged video stat"
 		log.Println("[controller]", errMessage)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errMessage})
 		return

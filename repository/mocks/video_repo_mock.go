@@ -23,3 +23,13 @@ func (m *MockVideoRepositoryImpl) GetVideoByID(id string) (*db.Video, error) {
 
 	return nil, args.Error(1)
 }
+
+func (m *MockVideoRepositoryImpl) GetVideosByIDs(ids []string) ([]db.Video, error) {
+	args := m.Called(ids)
+
+	if args.Get(0) != nil {
+		return args.Get(0).([]db.Video), args.Error(1)
+	}
+
+	return nil, args.Error(1)
+}

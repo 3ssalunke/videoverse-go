@@ -11,8 +11,7 @@ import (
 type VideoRepository interface {
 	CreateVideo(video *db.Video) error
 	GetVideoByID(id string) (*db.Video, error)
-	// GetAllVideos() ([]db.Video, error)
-	// DeleteVideo(id string) error
+	GetVideosByIDs(ids []string) ([]db.Video, error)
 }
 
 type VideoRepositoryImpl struct {
@@ -36,4 +35,17 @@ func (r *VideoRepositoryImpl) GetVideoByID(id string) (*db.Video, error) {
 	}
 
 	return &video, nil
+}
+
+func (r *VideoRepositoryImpl) GetVideosByIDs(ids []string) ([]db.Video, error) {
+	var videos []db.Video
+	result := r.db.Where("id in (?)", ids).Find(&videos)
+	if result.Error != nil {
+		{
+			log.Println("[repo] error while getting videos by ids: ", result.Error.Error())
+			return nil, errors.New("error getting videos by ids")
+		}
+	}
+
+	return videos, nil
 }
